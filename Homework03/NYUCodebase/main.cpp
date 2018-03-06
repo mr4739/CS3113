@@ -29,6 +29,23 @@ const float aspect = (float)640 / (float)360;
 const float projHeight = 2.0f, projWidth = 2.0f * aspect;
 const Uint8 *keys = SDL_GetKeyboardState(NULL);
 
+GLuint LoadTexture(const char *filepath) {
+	int w, h, comp;
+	unsigned char* image = stbi_load(filepath, &w, &h, &comp, STBI_rgb_alpha);
+	if (image == NULL) {
+		std::cout << "Unable to load image. Make sure the path is correct\n";
+		assert(false);
+	}
+	GLuint retTexture;
+	glGenTextures(1, &retTexture);
+	glBindTexture(GL_TEXTURE_2D, retTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	stbi_image_free(image);
+	return retTexture;
+}
 class SheetSprite {
 public:
 	SheetSprite() {};
@@ -99,56 +116,153 @@ public:
 	SheetSprite sprite;
 	int health;
 };
-class GameState {
-	// implement later
-};
 
-enum GameMode { START, PLAY, WIN, LOSE };
-GameMode mode = START;
-GameState state;
-GLuint sheetTexture;
-int fontTextureID;
-SheetSprite playerSprite, enemySprite, bulletSprite;
-Entity player;
-std::vector<Entity> enemies;
-std::vector<Entity> playerBullets;
-std::vector<Entity> enemyBullets;
+enum GameMode { STATE_TITLE_SCREEN, STATE_GAME_LEVEL, WIN, LOSE };
+GameMode mode = STATE_TITLE_SCREEN;
 float bulletReload = 0.5f;
 float enemyBulletReload = 0.0f;
 int score = 0;
 
+class GameState {
+public:
+	// initialize sprites and player
+	void loadEntities() {
+		fontTextureID = LoadTexture(RESOURCE_FOLDER"font1.png");
+		sheetTexture = LoadTexture(RESOURCE_FOLDER"sheet.png");
+		playerSprite = SheetSprite(sheetTexture, 224.0f / 1024.0f, 832.0f / 1024.0f,
+			99.0f / 1024.0f, 75.0f / 1024.0f, 0.5);
+		player = Entity(0.0f, projHeight*-0.85f, playerSprite.width*playerSprite.size / playerSprite.height,
+			playerSprite.size, playerSprite, 3);
+		bulletSprite = SheetSprite(sheetTexture, 856.0f / 1024.0f, 421.0f / 1024.0f,
+			9.0f / 1024.0f, 54.0f / 1024.0f, 0.3);
+		enemySprite = SheetSprite(sheetTexture, 425.0f / 1024.0f, 468.0f / 1024.0f,
+			93.0f / 1024.0f, 84.0f / 1024.0f, 0.3);
+	}
+	// adds new enemies to enemies vector
+	void spawnEnemies() {
+		for (int i = 0; i < 10; i++) {
+			for (int j = 0; j < 4; j++) {
+				Entity enemy = Entity(projWidth*-0.7f + i * enemySprite.width * 5,
+					projHeight*0.4f + j * enemySprite.height * 4,
+					enemySprite.width*enemySprite.size / enemySprite.height, enemySprite.size, enemySprite, 1);
+				enemy.velX = 1.5f;
+				enemies.push_back(enemy);
+			}
+		}
+	}
+	// reset for new game
+	void reset() {
+		enemies.clear();
+		playerBullets.clear();
+		enemyBullets.clear();
+		player.health = 3;
+		score = 0;
+		spawnEnemies();
+	}
+	void Update() {
+		// player mvmt
+		if (keys[SDL_SCANCODE_LEFT]) {
+			player.x -= elapsed * 3.0f;
+			if (player.x <= -projWidth + player.width / 2) {
+				player.x = -projWidth + player.width / 2;
+			}
+		}
+		else if (keys[SDL_SCANCODE_RIGHT]) {
+			player.x += elapsed * 3.0f;
+			if (player.x >= projWidth - player.width / 2) {
+				player.x = projWidth - player.width / 2;
+			}
+		}
+		// enemy mvmt
+		if (enemies[0].x - enemies[0].width / 2 < -3.55f || enemies.back().x + enemies.back().width / 2 > 3.55f) {
+			for (int i = 0; i < enemies.size(); i++) {
+				//enemies[i].y -= 0.2f;
+				enemies[i].velX *= -1;
+			}
+		}
+		for (int i = 0; i < enemies.size(); i++) {
+			enemies[i].x += elapsed * enemies[i].velX;
+		}
+		if (keys[SDL_SCANCODE_UP] && bulletReload >= 0.5f && player.health > 0) {
+			player.shootBullet(0);
+			bulletReload = 0.0f;
+		}
+		int randomEnemy = rand() % enemies.size();
+		if (enemyBulletReload >= 0.6f) {
+			enemies[randomEnemy].shootBullet(1);
+			enemyBulletReload = 0.0f;
+		}
+		// update bullets
+		// ------- player bullets vs enemies
+		for (int i = 0; i < playerBullets.size(); i++) {
+			playerBullets[i].y += playerBullets[i].velY * elapsed;
+			if (playerBullets[i].y >= projHeight) {
+				playerBullets.erase(playerBullets.begin() + i);
+			}
+			else {
+				for (int j = 0; j < enemies.size(); j++) {
+					if (playerBullets[i].collidesWith(enemies[j])) {
+						score += 100;
+						playerBullets[i].health -= 1;
+						enemies[j].health -= 1;
+						playerBullets.erase(playerBullets.begin() + i);
+						if (enemies[j].health == 0) {
+							enemies.erase(enemies.begin() + j);
+						}
+						break;
+					}
+				}
+			}
+		}
+		// ------- enemy bullets vs player
+		for (int i = 0; i < enemyBullets.size(); i++) {
+			enemyBullets[i].y += enemyBullets[i].velY * elapsed;
+			if (enemyBullets[i].y <= -projHeight) {
+				enemyBullets.erase(enemyBullets.begin() + i);
+			}
+			else {
+				if (enemyBullets[i].collidesWith(player)) {
+					enemyBullets[i].health -= 1;
+					enemyBullets.erase(enemyBullets.begin() + i);
+					player.health -= 1;
+				}
+			}
+		}
+		// player is dead
+		if (player.health <= 0) {
+			mode = LOSE;
+		}
+		// all enemies dead
+		if (enemies.size() == 0) {
+			mode = WIN;
+		}
+	}
+	GLuint sheetTexture;
+	int fontTextureID;
+	SheetSprite playerSprite, enemySprite, bulletSprite;
+	Entity player;
+	std::vector<Entity> enemies;
+	std::vector<Entity> playerBullets;
+	std::vector<Entity> enemyBullets;
+};
+
+GameState state;
+
 void Entity::shootBullet(int type) {
-	Entity bullet = Entity(x, y, bulletSprite.width*bulletSprite.size,
-		bulletSprite.height*bulletSprite.size, bulletSprite, 1.0f);
+	Entity bullet = Entity(x, y, state.bulletSprite.width * state.bulletSprite.size,
+		state.bulletSprite.height * state.bulletSprite.size, state.bulletSprite, 1.0f);
 	// type = 1 = enemy bullet
 	if (type) {
 		bullet.velY = -2.0f;
-		enemyBullets.push_back(bullet);
+		state.enemyBullets.push_back(bullet);
 	}
 	// type = 0 = player bullet
 	else {
 		bullet.velY = 2.0f;
-		playerBullets.push_back(bullet);
+		state.playerBullets.push_back(bullet);
 	}
 }
 
-GLuint LoadTexture(const char *filepath) {
-	int w, h, comp;
-	unsigned char* image = stbi_load(filepath, &w, &h, &comp, STBI_rgb_alpha);
-	if (image == NULL) {
-		std::cout << "Unable to load image. Make sure the path is correct\n";
-		assert(false);
-	}
-	GLuint retTexture;
-	glGenTextures(1, &retTexture);
-	glBindTexture(GL_TEXTURE_2D, retTexture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	stbi_image_free(image);
-	return retTexture;
-}
 void DrawText(ShaderProgram* program, int fontTexture, std::string text, float x, float y, float size, float spacing) {
 	Matrix modelMatrix;
 	modelMatrix.Translate(x, y, 0);
@@ -179,7 +293,6 @@ void DrawText(ShaderProgram* program, int fontTexture, std::string text, float x
 			});
 	}
 	glBindTexture(GL_TEXTURE_2D, fontTexture);
-
 	glVertexAttribPointer(program->positionAttribute, 2, GL_FLOAT, false, 0, vertexData.data());
 	glEnableVertexAttribArray(program->positionAttribute);
 	glVertexAttribPointer(program->texCoordAttribute, 2, GL_FLOAT, false, 0, texCoordData.data());
@@ -188,28 +301,6 @@ void DrawText(ShaderProgram* program, int fontTexture, std::string text, float x
 	glDisableVertexAttribArray(program->positionAttribute);
 	glDisableVertexAttribArray(program->texCoordAttribute);
 }
-
-void spawnEnemies() {
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			Entity enemy = Entity(projWidth*-0.7f + i * enemySprite.width * 5,
-				projHeight*0.4f + j * enemySprite.height * 4,
-				enemySprite.width*enemySprite.size / enemySprite.height, enemySprite.size, enemySprite, 1);
-			enemy.velX = 1.5f;
-			enemies.push_back(enemy);
-		}
-	}
-}
-
-void reset() {
-	enemies.clear();
-	playerBullets.clear();
-	enemyBullets.clear();
-	player.health = 3;
-	score = 0;
-	spawnEnemies();
-}
-
 
 void Setup() {
 	SDL_Init(SDL_INIT_VIDEO);
@@ -224,19 +315,9 @@ void Setup() {
 	glClearColor(0.455f, 0.0f, 0.416f, 1.0f);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	fontTextureID = LoadTexture(RESOURCE_FOLDER"font1.png");
 
-	// initialize entities
-	sheetTexture = LoadTexture(RESOURCE_FOLDER"sheet.png");
-	playerSprite = SheetSprite(sheetTexture, 224.0f / 1024.0f, 832.0f / 1024.0f,
-		99.0f / 1024.0f, 75.0f / 1024.0f, 0.5);
-	player = Entity(0.0f, projHeight*-0.85f, playerSprite.width*playerSprite.size/playerSprite.height,
-		playerSprite.size, playerSprite, 3);
-	bulletSprite = SheetSprite(sheetTexture, 856.0f / 1024.0f, 421.0f / 1024.0f,
-		9.0f / 1024.0f, 54.0f / 1024.0f, 0.3);
-	enemySprite = SheetSprite(sheetTexture, 425.0f / 1024.0f, 468.0f / 1024.0f,
-		93.0f / 1024.0f, 84.0f / 1024.0f, 0.3);
-	spawnEnemies();
+	state.loadEntities();
+	state.spawnEnemies();
 }
 
 void ProcessEvents() {
@@ -247,113 +328,36 @@ void ProcessEvents() {
 	}
 }
 
-void Update() {
-	// player mvmt
-	if (keys[SDL_SCANCODE_LEFT]) {
-		player.x -= elapsed * 3.0f;
-		if (player.x <= -projWidth + player.width/2) {
-			player.x = -projWidth + player.width/2;
-		}
-	}
-	else if (keys[SDL_SCANCODE_RIGHT]) {
-		player.x += elapsed * 3.0f;
-		if (player.x >= projWidth - player.width/2) {
-			player.x = projWidth - player.width/2;
-		}
-	}
-	// enemy mvmt
-	if (enemies[0].x - enemies[0].width / 2 < -3.55f || enemies.back().x + enemies.back().width / 2 > 3.55f) {
-		for (int i = 0; i < enemies.size(); i++) {
-			//enemies[i].y -= 0.2f;
-			enemies[i].velX *= -1;
-		}
-	}
-	for (int i = 0; i < enemies.size(); i++) {
-		enemies[i].x += elapsed * enemies[i].velX;
-	}
-	if (keys[SDL_SCANCODE_UP] && bulletReload >= 0.5f && player.health > 0) {
-		player.shootBullet(0);
-		bulletReload = 0.0f;
-	}
-	int randomEnemy = rand() % enemies.size();
-	if (enemyBulletReload >= 0.6f) {
-		enemies[randomEnemy].shootBullet(1);
-		enemyBulletReload = 0.0f;
-	}
-	// update bullets
-	// ------- player bullets vs enemies
-	for (int i = 0; i < playerBullets.size(); i++) {
-		playerBullets[i].y += playerBullets[i].velY * elapsed;
-		if (playerBullets[i].y >= projHeight) {
-			playerBullets.erase(playerBullets.begin()+i);
-		}
-		else {
-			for (int j = 0; j < enemies.size(); j++) {
-				if (playerBullets[i].collidesWith(enemies[j])) {
-					score += 100;
-					playerBullets[i].health -= 1;
-					enemies[j].health -= 1;
-					playerBullets.erase(playerBullets.begin() + i);
-					if (enemies[j].health == 0) {
-						enemies.erase(enemies.begin() + j);
-					}
-					break;
-				}
-			}
-		}
-	}
-	// ------- enemy bullets vs player
-	for (int i = 0; i < enemyBullets.size(); i++) {
-		enemyBullets[i].y += enemyBullets[i].velY * elapsed;
-		if (enemyBullets[i].y <= -projHeight) {
-			enemyBullets.erase(enemyBullets.begin() + i);
-		}
-		else {
-			if (enemyBullets[i].collidesWith(player)) {
-				enemyBullets[i].health -= 1;
-				enemyBullets.erase(enemyBullets.begin() + i);
-				player.health -= 1;
-			}
-		}
-	}
-	if (player.health <= 0) {
-		mode = LOSE;
-	}
-	if (enemies.size() == 0) {
-		mode = WIN;
-	}
-}
-
 void updateState() {
 	switch (mode) {
-	case START:
+	case STATE_TITLE_SCREEN:
 		break;
-	case PLAY:
-		Update();
+	case STATE_GAME_LEVEL:
+		state.Update();
 		break;
 	}
 }
 
 void RenderGame() {
 	if (keys[SDL_SCANCODE_0]) {
-		mode = START;
+		mode = STATE_TITLE_SCREEN;
 	}
 	glClear(GL_COLOR_BUFFER_BIT);
 	// draw text
-	DrawText(&program, fontTextureID, "Lives: " + std::to_string(player.health), -3.0f, -1.5f, 0.3f, -0.15f);
-	DrawText(&program, fontTextureID, "Score: " + std::to_string(score), 2.0f, -1.5f, 0.3f, -0.15f);
+	DrawText(&program, state.fontTextureID, "Lives: " + std::to_string(state.player.health), -3.0f, -1.5f, 0.3f, -0.15f);
+	DrawText(&program, state.fontTextureID, "Score: " + std::to_string(score), 1.7f, -1.5f, 0.3f, -0.15f);
 	// draw entities
-	player.Draw(program);
-	for (int i = 0; i < enemies.size(); i++) {
-		enemies[i].Draw(program);
+	state.player.Draw(program);
+	for (int i = 0; i < state.enemies.size(); i++) {
+		state.enemies[i].Draw(program);
 	}
 	bulletReload += elapsed;
 	enemyBulletReload += elapsed;
-	for (int i = 0; i < playerBullets.size(); i++) {
-		playerBullets[i].Draw(program);
+	for (int i = 0; i < state.playerBullets.size(); i++) {
+		state.playerBullets[i].Draw(program);
 	}
-	for (int i = 0; i < enemyBullets.size(); i++) {
-		enemyBullets[i].Draw(program);
+	for (int i = 0; i < state.enemyBullets.size(); i++) {
+		state.enemyBullets[i].Draw(program);
 	}
 	SDL_GL_SwapWindow(displayWindow);
 }
@@ -361,40 +365,40 @@ void RenderGame() {
 void renderState() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	switch (mode) {
-	case START:
+	case STATE_TITLE_SCREEN:
 		if (keys[SDL_SCANCODE_SPACE]) {
-			mode = PLAY;
+			mode = STATE_GAME_LEVEL;
 		}
-		player.Draw(program);
-		DrawText(&program, fontTextureID, "SPACE INVADERS", 7*(-0.5+0.12), 0.7f, 0.5f, -0.12f);
-		DrawText(&program, fontTextureID, "SPACE to start", 7*(-0.3f+0.12), 0.2f, 0.3f, -0.12f);
-		DrawText(&program, fontTextureID, "LEFT/RIGHT to move", 9*(-0.3f+0.12), -0.2f, 0.3f, -0.12f);
-		DrawText(&program, fontTextureID, "UP to shoot", 11/2*(-0.3f+0.12), -0.6f, 0.3f, -0.12f);
+		state.player.Draw(program);
+		DrawText(&program, state.fontTextureID, "SPACE INVADERS", 7*(-0.5+0.12), 0.7f, 0.5f, -0.12f);
+		DrawText(&program, state.fontTextureID, "SPACE to start", 7*(-0.3f+0.12), 0.2f, 0.3f, -0.12f);
+		DrawText(&program, state.fontTextureID, "LEFT/RIGHT to move", 9*(-0.3f+0.12), -0.2f, 0.3f, -0.12f);
+		DrawText(&program, state.fontTextureID, "UP to shoot", 11/2*(-0.3f+0.12), -0.6f, 0.3f, -0.12f);
 		SDL_GL_SwapWindow(displayWindow);
 		break;
-	case PLAY:
+	case STATE_GAME_LEVEL:
 		RenderGame();
 		break;
 	case WIN:
 		if (keys[SDL_SCANCODE_SPACE]) {
-			reset();
-			mode = START;
+			state.reset();
+			mode = STATE_TITLE_SCREEN;
 		}
-		player.Draw(program);
-		DrawText(&program, fontTextureID, "VICTORY!", 4*(-0.5f+0.12), 0.7f, 0.5f, -0.12f);
-		DrawText(&program, fontTextureID, "Score: " + std::to_string(score), 11/2 * (-0.3f + 0.12), 0.2f, 0.3f, -0.12f);
-		DrawText(&program, fontTextureID, "SPACE to restart", 8*(-0.3f + 0.12), -0.2f, 0.3f, -0.12f);
+		state.player.Draw(program);
+		DrawText(&program, state.fontTextureID, "VICTORY!", 4*(-0.5f+0.12), 0.7f, 0.5f, -0.12f);
+		DrawText(&program, state.fontTextureID, "Score: " + std::to_string(score), 11/2 * (-0.3f + 0.12), 0.2f, 0.3f, -0.12f);
+		DrawText(&program, state.fontTextureID, "SPACE to restart", 8*(-0.3f + 0.12), -0.2f, 0.3f, -0.12f);
 		SDL_GL_SwapWindow(displayWindow);
 		break;
 	case LOSE:
 		if (keys[SDL_SCANCODE_SPACE]) {
-			reset();
-			mode = START;
+			state.reset();
+			mode = STATE_TITLE_SCREEN;
 		}
-		player.Draw(program);
-		DrawText(&program, fontTextureID, "YOU DIED!", 9/2 * (-0.5f + 0.12), 0.7f, 0.5f, -0.12f);
-		DrawText(&program, fontTextureID, "Score: " + std::to_string(score), 11 / 2 * (-0.3f + 0.12), 0.2f, 0.3f, -0.12f);
-		DrawText(&program, fontTextureID, "SPACE to restart", 8 * (-0.3f + 0.12), -0.2f, 0.3f, -0.12f);
+		state.player.Draw(program);
+		DrawText(&program, state.fontTextureID, "YOU DIED!", 9/2 * (-0.5f + 0.12), 0.7f, 0.5f, -0.12f);
+		DrawText(&program, state.fontTextureID, "Score: " + std::to_string(score), 11 / 2 * (-0.3f + 0.12), 0.2f, 0.3f, -0.12f);
+		DrawText(&program, state.fontTextureID, "SPACE to restart", 8 * (-0.3f + 0.12), -0.2f, 0.3f, -0.12f);
 		SDL_GL_SwapWindow(displayWindow);
 		break;
 	}
