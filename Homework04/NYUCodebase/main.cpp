@@ -42,7 +42,7 @@ const Uint8 *keys = SDL_GetKeyboardState(NULL);
 bool done = false;
 FlareMap map;
 float TILE_SIZE = 0.5f;
-float FRICTION = 0.5f;
+float FRICTION = 2.0f;
 float GRAVITY = 3.0f;
 Matrix projectionMatrix, modelMatrix, viewMatrix;
 float lastFrameTicks = 0.0f;
@@ -116,13 +116,17 @@ void ProcessEvents() {
 	}
 }
 
+int CTX, CTY, CRX, CRY, CBX, CBY, CLX, CLY;
 void Update(float elapsed) {
-
 	if (keys[SDL_SCANCODE_LEFT] && !player.collidedLeft) {
-		player.x -= elapsed * 3.0f;
+		//cout << player.velX << ", ";
+		player.velX = -3.0f;
+		//cout << player.velX << endl;
+		//player.x -= elapsed * 3.0f;
 	}
 	else if (keys[SDL_SCANCODE_RIGHT] && !player.collidedRight) {
-		player.x += elapsed * 3.0f;
+		player.velX = 3.0f;
+		//player.x += elapsed * 3.0f;
 	}
 
 	player.collidedBottom = false;
@@ -137,27 +141,26 @@ void Update(float elapsed) {
 	worldToTileCoords(player.x, player.y - 1, &BLX, &BLY);
 	worldToTileCoords(player.x + 1, player.y - 1, &BRX, &BRY);
 
+	worldToTileCoords(player.x + 0.5, player.y, &CTX, &CTY);
+	worldToTileCoords(player.x + 0.5, player.y - 1, &CBX, &CBY);
+	worldToTileCoords(player.x, player.y - 0.5, &CLX, &CLY);
+	worldToTileCoords(player.x + 1, player.y - 0.5, &CRX, &CRY);
+
 	//-------- Top Left and Top Right corner check
-	if (collides(map.mapData[centY-1][centX]) && (collides(map.mapData[TLY][TLX]) || collides(map.mapData[TRY][TRX]))) {
-	//if (collides(map.mapData[TLY][TLX]) || collides(map.mapData[TRY][TRX])) {
+	if (collides(map.mapData[CTY][CTX]) && (collides(map.mapData[TLY][TLX]) || collides(map.mapData[TRY][TRX]))) {
 		player.collidedTop = true;
 	}
 	//-------- Bottom Left and Bottom Right corner check
-	else if (collides(map.mapData[centY+1][centX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[BRY][BRX]))) {
-	//else if (collides(map.mapData[BLY][BLX]) || collides(map.mapData[BRY][BRX])) {
+	else if (collides(map.mapData[CBY][CBX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[BRY][BRX]))) {
 		player.collidedBottom = true;
 		player.isJumping = false;
-		//player.accelY = 0.0f;
-		//player.velY = 0.0f;
 	}
 	//-------- Top Left and Bottom Left corner check
-	if (collides(map.mapData[centY][centX-1]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[TLY][TLX]))) {
-	//if (collides(map.mapData[BLY][BLX]) || collides(map.mapData[TLY][TLX])) {
+	if (collides(map.mapData[CLY][CLX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[TLY][TLX]))) {
 		player.collidedLeft = true;
 	}
 	//-------- Top Right and Bottom Right corner check
-	else if (collides(map.mapData[centY][centX + 1]) && (collides(map.mapData[TRY][TRX]) || collides(map.mapData[BRY][BRX]))) {
-	//else if (collides(map.mapData[TRY][TRX]) || collides(map.mapData[BRY][BRX])) {
+	else if (collides(map.mapData[CRY][CRX]) && (collides(map.mapData[TRY][TRX]) || collides(map.mapData[BRY][BRX]))) {
 		player.collidedRight = true;
 	}
 
@@ -171,14 +174,11 @@ void Update(float elapsed) {
 		cout << "BL: [" << BLX << ", " << BLY << "]" << endl;
 		cout << "BR: [" << BRX << ", " << BRY << "]" << endl;
 	}
+
 	if (keys[SDL_SCANCODE_UP] && !player.collidedTop && player.collidedBottom) {
 		//player.accelY = 1.0f;
 		player.velY = 2.0f;
 		player.jump();
-		//player.y += elapsed * 3.0f;
-	}
-	else {
-		player.velY = -2.0f;
 	}
 
 	player.Update(elapsed, FRICTION, GRAVITY);

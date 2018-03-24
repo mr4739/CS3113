@@ -30,6 +30,9 @@ void Entity::Update(float elapsed, float friction, float grav) {
 			velY = 0.0f;
 		}
 		x += velX * elapsed;
+		if (collidedLeft || collidedRight) {
+			velX = 0.0f;
+		}
 		y += velY * elapsed;
 	}
 }
