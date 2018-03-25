@@ -7,11 +7,6 @@ Entity::Entity(float x, float y, float width, float height, float accelX, float 
 
 void Entity::Update(float elapsed, float friction, float grav) {
 	if (!isStatic) {
-		/*velX = lerp(velX, 0.0f, elapsed*friction);
-		velY = lerp(velY, 0.0f, elapsed*grav);*/
-		/*velX += accelX * elapsed;
-		velY += accelY * elapsed;*/
-
 		if (isJumping) {
 			collidedBottom = false;
 			velY = 3.0f;

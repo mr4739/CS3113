@@ -1,4 +1,11 @@
-/* Homework 04 - Platformer Demo*/
+// Homework 04 - Platformer Demo
+// INSTRUCTIONS:
+//   - LEFT, RIGHT to walk
+//   - UP to jump
+//   - R to restart
+//   - Player is chased by a ghost enemy and dies if caught or if player falls in lava
+//   - (This game is unwinnable)
+
 
 #ifdef _WINDOWS
 	#include <GL/glew.h>
@@ -25,8 +32,6 @@
 #define SPRITE_COUNT_Y 30
 #define FIXED_TIMESTEP 0.0166666f
 #define MAX_TIMESTEPS 6
-//#define FRICTION 0.5f;
-//#define GRAVITY -1.0f;
 using namespace std;
 
 #ifdef _WINDOWS
@@ -57,6 +62,7 @@ Entity player;
 SheetSprite playerSprite;
 Entity enemy;
 SheetSprite enemySprite;
+GLuint tileset;
 
 GLuint LoadTexture(const char *filepath) {
 	int w, h, comp;
@@ -79,13 +85,10 @@ void worldToTileCoords(float worldX, float worldY, int* gridX, int* gridY) {
 	*gridX = (int)(worldX / TILE_SIZE * 0.5);
 	*gridY = (int)(-worldY / TILE_SIZE * 0.5);
 }
-void OOworldToTileCoords(float worldX, float worldY, int* gridX, int* gridY) {
-	*gridX = round(worldX / TILE_SIZE * 0.5);
-	*gridY = round(-worldY / TILE_SIZE * 0.5);
-}
+
 bool collides(int textureID);
-GLuint tileset;
 void renderLevel(ShaderProgram* program);
+void replay();
 
 void Setup() {
 	SDL_Init(SDL_INIT_VIDEO);
@@ -119,6 +122,11 @@ void ProcessEvents() {
 		if (event.type == SDL_QUIT || event.type == SDL_WINDOWEVENT_CLOSE) {
 			done = true;
 		}
+		else if (event.type == SDL_KEYDOWN) {
+			if (event.key.keysym.scancode == SDL_SCANCODE_R) {
+				replay();
+			}
+		}
 	}
 }
 void Update(float elapsed) {
@@ -135,55 +143,42 @@ void Update(float elapsed) {
 		player.collidedLeft = false;
 		player.collidedRight = false;
 
-		// collision checks
+		// corners of player sprite
 		worldToTileCoords(player.x + 0.5, player.y - 0.5, &centX, &centY);
 		worldToTileCoords(player.x, player.y, &TLX, &TLY);
 		worldToTileCoords(player.x + 1, player.y, &TRX, &TRY);
 		worldToTileCoords(player.x, player.y - 1, &BLX, &BLY);
 		worldToTileCoords(player.x + 1, player.y - 1, &BRX, &BRY);
 
+		// centers of player sprite sides
 		worldToTileCoords(player.x + 0.5, player.y, &CTX, &CTY);
 		worldToTileCoords(player.x + 0.5, player.y - 1, &CBX, &CBY);
 		worldToTileCoords(player.x, player.y - 0.5, &CLX, &CLY);
 		worldToTileCoords(player.x + 1, player.y - 0.5, &CRX, &CRY);
 
-		//-------- Top Left and Top Right corner check
+		//-------- Top Center, Top Left and Top Right corner check
 		if (collides(map.mapData[CTY][CTX]) && (collides(map.mapData[TLY][TLX]) || collides(map.mapData[TRY][TRX]))) {
 			player.collidedTop = true;
 		}
-		//-------- Bottom Left and Bottom Right corner check
+		//-------- Bottom Center, Bottom Left and Bottom Right corner check
 		else if (collides(map.mapData[CBY][CBX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[BRY][BRX]))) {
 			player.collidedBottom = true;
 			player.isJumping = false;
 		}
-		//-------- Top Left and Bottom Left corner check
+		//-------- Left Center, Top Left and Bottom Left corner check
 		if (collides(map.mapData[CLY][CLX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[TLY][TLX]))) {
 			player.collidedLeft = true;
 		}
-		//-------- Top Right and Bottom Right corner check
+		//-------- Right Center, Top Right and Bottom Right corner check
 		else if (collides(map.mapData[CRY][CRX]) && (collides(map.mapData[TRY][TRX]) || collides(map.mapData[BRY][BRX]))) {
 			player.collidedRight = true;
 		}
-
-		if (keys[SDL_SCANCODE_SPACE]) {
-			cout << "(" << player.x << ", " << player.y << ") " << endl;
-			cout << "T: " << player.collidedTop << " || B: " << player.collidedBottom << " || L: " << player.collidedLeft <<
-				" || R: " << player.collidedRight << endl;
-			cout << "ME: [" << centX << ", " << centY << "]" << endl;
-			cout << "TL: [" << TLX << ", " << TLY << "]" << endl;
-			cout << "TR: [" << TRX << ", " << TRY << "]" << endl;
-			cout << "BL: [" << BLX << ", " << BLY << "]" << endl;
-			cout << "BR: [" << BRX << ", " << BRY << "]" << endl;
-		}
-
 		if (keys[SDL_SCANCODE_UP] && !player.collidedTop && player.collidedBottom) {
-			//player.accelY = 1.0f;
 			player.velY = 2.0f;
 			player.jump();
 		}
 		
 		if (player.y <= -16.0f) {
-			cout << "you died b" << endl;
 			player.health = 0;
 		}
 
@@ -211,19 +206,12 @@ void Render() {
 	enemy.Draw(program);
 	viewMatrix.Translate(-player.x * 0.5f, -player.y * 0.5f, 0.0f);
 	program.SetViewMatrix(viewMatrix);
+
 	SDL_GL_SwapWindow(displayWindow);
 }
 
 int main(int argc, char *argv[]) {
 	Setup();
-	//map.printMapData();
-	//cout << map.mapHeight << ", " << map.mapWidth << endl; // 20 and 48
-	//cout << "0,0: " << map.mapData[0][0] << endl; //182 // block
-	//cout << "19,0: " << map.mapData[19][0] << endl; //42 //solid lava
-	//cout << "17,10: " << map.mapData[17][10] << endl; //13 //lava
-	//cout << "16,10: " << map.mapData[16][10] << endl; //212 // block
-	//cout << map.entities[0].type << ", " << map.entities[0].x << ", " << map.entities[0].y << endl;
-	//cout << map.entities[1].type << ", " << map.entities[1].x << ", " << map.entities[1].y << endl;
 	while (!done) {
 		float ticks = (float)SDL_GetTicks() / 1000.0f;
 		elapsed = ticks - lastFrameTicks;
@@ -235,6 +223,14 @@ int main(int argc, char *argv[]) {
 	SDL_Quit();
 	getchar();
 	return 0;
+}
+
+void replay() {
+	player.x = 13.0f;
+	player.y = -14.0f;
+	enemy.x = 28.0f;
+	enemy.y = -8.0f;
+	player.health = 1;
 }
 
 void renderLevel(ShaderProgram* program) {

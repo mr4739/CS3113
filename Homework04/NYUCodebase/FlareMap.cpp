@@ -1,4 +1,3 @@
-
 #include "FlareMap.h"
 #include <fstream>
 #include <string>
