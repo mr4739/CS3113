@@ -48,11 +48,15 @@ Matrix projectionMatrix, modelMatrix, viewMatrix;
 float lastFrameTicks = 0.0f;
 float elapsed = 0.0f;
 float accumulator = 0.0f;
-Entity player;
-SheetSprite playerSprite;
 int TRX, TRY, TLX, TLY, BLX, BLY, BRX, BRY;
+int CTX, CTY, CRX, CRY, CBX, CBY, CLX, CLY;
 int centX, centY;
 int nonsolids[] = { 0, 16, 73 };
+
+Entity player;
+SheetSprite playerSprite;
+Entity enemy;
+SheetSprite enemySprite;
 
 GLuint LoadTexture(const char *filepath) {
 	int w, h, comp;
@@ -105,7 +109,9 @@ void Setup() {
 	
 	map.Load("hw04map.txt");
 	playerSprite = SheetSprite(tileset, 79, TILE_SIZE);
-	player = Entity(13.0f, -14.0f, 0.5f, 0.5f, 0.0f, -4.0f, playerSprite, 3, PLAYER, false);
+	player = Entity(13.0f, -14.0f, 0.5f, 0.5f, 0.0f, -4.0f, playerSprite, 1, PLAYER, false);
+	enemySprite = SheetSprite(tileset, 445, TILE_SIZE);
+	enemy = Entity(28.0f, -8.0f, 0.5f, 0.5f, 0.0f, 0.0f, enemySprite, 10, ENEMY, false);
 }
 
 void ProcessEvents() {
@@ -115,73 +121,81 @@ void ProcessEvents() {
 		}
 	}
 }
-
-int CTX, CTY, CRX, CRY, CBX, CBY, CLX, CLY;
 void Update(float elapsed) {
-	if (keys[SDL_SCANCODE_LEFT] && !player.collidedLeft) {
-		//cout << player.velX << ", ";
-		player.velX = -3.0f;
-		//cout << player.velX << endl;
-		//player.x -= elapsed * 3.0f;
-	}
-	else if (keys[SDL_SCANCODE_RIGHT] && !player.collidedRight) {
-		player.velX = 3.0f;
-		//player.x += elapsed * 3.0f;
-	}
+	if (player.health) {
+		if (keys[SDL_SCANCODE_LEFT] && !player.collidedLeft) {
+			player.velX = -3.0f;
+		}
+		else if (keys[SDL_SCANCODE_RIGHT] && !player.collidedRight) {
+			player.velX = 3.0f;
+		}
 
-	player.collidedBottom = false;
-	player.collidedTop = false;
-	player.collidedLeft = false;
-	player.collidedRight = false;
+		player.collidedBottom = false;
+		player.collidedTop = false;
+		player.collidedLeft = false;
+		player.collidedRight = false;
 
-	// collision checks
-	worldToTileCoords(player.x + 0.5, player.y - 0.5, &centX, &centY);
-	worldToTileCoords(player.x, player.y, &TLX, &TLY);
-	worldToTileCoords(player.x + 1, player.y, &TRX, &TRY);
-	worldToTileCoords(player.x, player.y - 1, &BLX, &BLY);
-	worldToTileCoords(player.x + 1, player.y - 1, &BRX, &BRY);
+		// collision checks
+		worldToTileCoords(player.x + 0.5, player.y - 0.5, &centX, &centY);
+		worldToTileCoords(player.x, player.y, &TLX, &TLY);
+		worldToTileCoords(player.x + 1, player.y, &TRX, &TRY);
+		worldToTileCoords(player.x, player.y - 1, &BLX, &BLY);
+		worldToTileCoords(player.x + 1, player.y - 1, &BRX, &BRY);
 
-	worldToTileCoords(player.x + 0.5, player.y, &CTX, &CTY);
-	worldToTileCoords(player.x + 0.5, player.y - 1, &CBX, &CBY);
-	worldToTileCoords(player.x, player.y - 0.5, &CLX, &CLY);
-	worldToTileCoords(player.x + 1, player.y - 0.5, &CRX, &CRY);
+		worldToTileCoords(player.x + 0.5, player.y, &CTX, &CTY);
+		worldToTileCoords(player.x + 0.5, player.y - 1, &CBX, &CBY);
+		worldToTileCoords(player.x, player.y - 0.5, &CLX, &CLY);
+		worldToTileCoords(player.x + 1, player.y - 0.5, &CRX, &CRY);
 
-	//-------- Top Left and Top Right corner check
-	if (collides(map.mapData[CTY][CTX]) && (collides(map.mapData[TLY][TLX]) || collides(map.mapData[TRY][TRX]))) {
-		player.collidedTop = true;
-	}
-	//-------- Bottom Left and Bottom Right corner check
-	else if (collides(map.mapData[CBY][CBX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[BRY][BRX]))) {
-		player.collidedBottom = true;
-		player.isJumping = false;
-	}
-	//-------- Top Left and Bottom Left corner check
-	if (collides(map.mapData[CLY][CLX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[TLY][TLX]))) {
-		player.collidedLeft = true;
-	}
-	//-------- Top Right and Bottom Right corner check
-	else if (collides(map.mapData[CRY][CRX]) && (collides(map.mapData[TRY][TRX]) || collides(map.mapData[BRY][BRX]))) {
-		player.collidedRight = true;
-	}
+		//-------- Top Left and Top Right corner check
+		if (collides(map.mapData[CTY][CTX]) && (collides(map.mapData[TLY][TLX]) || collides(map.mapData[TRY][TRX]))) {
+			player.collidedTop = true;
+		}
+		//-------- Bottom Left and Bottom Right corner check
+		else if (collides(map.mapData[CBY][CBX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[BRY][BRX]))) {
+			player.collidedBottom = true;
+			player.isJumping = false;
+		}
+		//-------- Top Left and Bottom Left corner check
+		if (collides(map.mapData[CLY][CLX]) && (collides(map.mapData[BLY][BLX]) || collides(map.mapData[TLY][TLX]))) {
+			player.collidedLeft = true;
+		}
+		//-------- Top Right and Bottom Right corner check
+		else if (collides(map.mapData[CRY][CRX]) && (collides(map.mapData[TRY][TRX]) || collides(map.mapData[BRY][BRX]))) {
+			player.collidedRight = true;
+		}
 
-	if (keys[SDL_SCANCODE_SPACE]) {
-		cout << "(" << player.x << ", " << player.y << ") " << endl;
-		cout << "T: " << player.collidedTop << " || B: " << player.collidedBottom << " || L: " << player.collidedLeft <<
-			" || R: " << player.collidedRight << endl;
-		cout << "ME: [" << centX << ", " << centY << "]" << endl;
-		cout << "TL: [" << TLX << ", " << TLY << "]" << endl;
-		cout << "TR: [" << TRX << ", " << TRY << "]" << endl;
-		cout << "BL: [" << BLX << ", " << BLY << "]" << endl;
-		cout << "BR: [" << BRX << ", " << BRY << "]" << endl;
-	}
+		if (keys[SDL_SCANCODE_SPACE]) {
+			cout << "(" << player.x << ", " << player.y << ") " << endl;
+			cout << "T: " << player.collidedTop << " || B: " << player.collidedBottom << " || L: " << player.collidedLeft <<
+				" || R: " << player.collidedRight << endl;
+			cout << "ME: [" << centX << ", " << centY << "]" << endl;
+			cout << "TL: [" << TLX << ", " << TLY << "]" << endl;
+			cout << "TR: [" << TRX << ", " << TRY << "]" << endl;
+			cout << "BL: [" << BLX << ", " << BLY << "]" << endl;
+			cout << "BR: [" << BRX << ", " << BRY << "]" << endl;
+		}
 
-	if (keys[SDL_SCANCODE_UP] && !player.collidedTop && player.collidedBottom) {
-		//player.accelY = 1.0f;
-		player.velY = 2.0f;
-		player.jump();
-	}
+		if (keys[SDL_SCANCODE_UP] && !player.collidedTop && player.collidedBottom) {
+			//player.accelY = 1.0f;
+			player.velY = 2.0f;
+			player.jump();
+		}
+		
+		if (player.y <= -16.0f) {
+			cout << "you died b" << endl;
+			player.health = 0;
+		}
 
-	player.Update(elapsed, FRICTION, GRAVITY);
+		player.Update(elapsed, FRICTION, GRAVITY);
+		enemy.y += (player.y - enemy.y) / abs(player.y - enemy.y) * elapsed;
+		enemy.x += (player.x - enemy.x) / abs(player.x - enemy.x) * elapsed;
+
+		if (player.collidesWith(enemy)) {
+			player.health = 0;
+		}
+
+	}
 }
 
 void Render() {
@@ -193,6 +207,8 @@ void Render() {
 	renderLevel(&program);
 	viewMatrix.Identity();
 	player.Draw(program);
+	viewMatrix.Identity();
+	enemy.Draw(program);
 	viewMatrix.Translate(-player.x * 0.5f, -player.y * 0.5f, 0.0f);
 	program.SetViewMatrix(viewMatrix);
 	SDL_GL_SwapWindow(displayWindow);

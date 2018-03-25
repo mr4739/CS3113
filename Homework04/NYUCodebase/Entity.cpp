@@ -14,8 +14,7 @@ void Entity::Update(float elapsed, float friction, float grav) {
 
 		if (isJumping) {
 			collidedBottom = false;
-			velY = 2.0f;
-			//accelY = -1.0f;
+			velY = 3.0f;
 		}
 		velX = lerp(velX, 0.0f, elapsed*friction);
 		velY = lerp(velY, 0.0f, elapsed*grav);
@@ -45,16 +44,15 @@ void Entity::jump() {
 }
 
 void Entity::Draw(ShaderProgram& program) {
-	if (health > 0) {
+	if (type == PLAYER) {
 		Matrix modelMatrix;
 		Matrix viewMatrix;
-		viewMatrix.Translate(-x*1.5, -y*1.5, 0.0f);
+		viewMatrix.Translate(-x * 1.5, -y * 1.5, 0.0f);
 		modelMatrix.Translate(x, y, 0.0f);
 		program.SetModelMatrix(modelMatrix);
 		program.SetViewMatrix(viewMatrix);
-
-		sprite.Draw(&program, x, y);
 	}
+	sprite.Draw(&program, x, y);
 }
 
 float Entity::lerp(float v0, float v1, float t) {
@@ -62,19 +60,6 @@ float Entity::lerp(float v0, float v1, float t) {
 }
 
 bool Entity::collidesWith(const Entity& otherEnt) const {
-	/*float otherRight = otherEnt.x + otherEnt.width/2;
-	float otherLeft = otherEnt.x - otherEnt.width/2;
-	float otherTop = otherEnt.y + otherEnt.height/2;
-	float otherBot = otherEnt.y - otherEnt.height/2;
-
-	float right = x + width/2;
-	float left = x - width/2;
-	float top = y + height/2;
-	float bot = y - height/2;
-
-	bool collision = !(bot > otherTop || top < otherBot || left > otherRight || right < otherLeft);
-	return collision;*/
-
 	return !(y - height / 2 > otherEnt.y + otherEnt.height / 2 ||
 		y + height / 2 < otherEnt.y - otherEnt.height / 2 ||
 		x - width / 2 > otherEnt.x + otherEnt.width / 2 ||
