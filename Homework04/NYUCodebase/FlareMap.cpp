@@ -61,7 +61,8 @@ bool FlareMap::ReadLayerData(std::ifstream &stream) {
 				//std::cout << "DATA LINE: " << line << std::endl;
 				for(int x=0; x < mapWidth; x++) {
 					std::getline(lineStream, tile, ',');
-					unsigned char val =  (unsigned char)atoi(tile.c_str());
+					unsigned int val = atoi(tile.c_str());
+					//unsigned char val =  (unsigned char)atoi(tile.c_str());
 					if(val > 0) {
 						mapData[y][x] = val-1;
 					} else  if (mapData[y][x] == 3452816845) {
