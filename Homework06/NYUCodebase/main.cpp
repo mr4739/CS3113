@@ -252,6 +252,7 @@ public:
 GameState state;
 
 void Entity::shootBullet(int type) {
+	Mix_PlayChannel(-1, bulletSound, 0);
 	Entity bullet = Entity(x, y, state.bulletSprite.width * state.bulletSprite.size,
 		state.bulletSprite.height * state.bulletSprite.size, state.bulletSprite, 1.0f);
 	// type = 1 = enemy bullet
@@ -264,6 +265,7 @@ void Entity::shootBullet(int type) {
 		bullet.velY = 2.0f;
 		state.playerBullets.push_back(bullet);
 	}
+	//Mix_HaltChannel(-1);
 }
 
 void DrawText(ShaderProgram* program, int fontTexture, std::string text, float x, float y, float size, float spacing) {
@@ -307,6 +309,7 @@ void DrawText(ShaderProgram* program, int fontTexture, std::string text, float x
 
 void Setup() {
 	SDL_Init(SDL_INIT_VIDEO);
+	SDL_Init(SDL_INIT_AUDIO);
 	displayWindow = SDL_CreateWindow("Homework03 - Space Invaders", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 360, SDL_WINDOW_OPENGL);
 	SDL_GLContext context = SDL_GL_CreateContext(displayWindow);
 	SDL_GL_MakeCurrent(displayWindow, context);
@@ -324,8 +327,13 @@ void Setup() {
 
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
 	music = Mix_LoadMUS("BobRoss.mp3");
-	Mix_PlayMusic(music, -1);
-	bulletSound = Mix_LoadWAV("bulletSound.wav");
+	//music = Mix_LoadMUS("bulletSound.wav");
+	//Mix_PlayMusic(music, -1);
+	bulletSound = Mix_LoadWAV(RESOURCE_FOLDER"bulletSound.wav");
+	
+	if (!bulletSound) {
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	}
 }
 
 void ProcessEvents() {
@@ -421,9 +429,12 @@ int main(int argc, char *argv[]) {
 		ProcessEvents();
 		updateState();
 		renderState();
+		//bulletSound = Mix_LoadWAV("bulletSound.wav");
+		//Mix_FadeInChannel(1, bulletSound, -1, 1);
 	}
 	Mix_FreeMusic(music);
 	Mix_FreeChunk(bulletSound);
+	Mix_CloseAudio();
 	SDL_Quit();
 	return 0;
 }
