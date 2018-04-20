@@ -31,6 +31,7 @@ const float projHeight = 2.0f, projWidth = 2.0f * aspect;
 const Uint8 *keys = SDL_GetKeyboardState(NULL);
 Mix_Music *music;
 Mix_Chunk *bulletSound;
+Mix_Chunk *bork;
 
 
 GLuint LoadTexture(const char *filepath) {
@@ -252,16 +253,17 @@ public:
 GameState state;
 
 void Entity::shootBullet(int type) {
-	Mix_PlayChannel(-1, bulletSound, 0);
 	Entity bullet = Entity(x, y, state.bulletSprite.width * state.bulletSprite.size,
 		state.bulletSprite.height * state.bulletSprite.size, state.bulletSprite, 1.0f);
 	// type = 1 = enemy bullet
 	if (type) {
+		//Mix_PlayChannel(-1, bork, 0);
 		bullet.velY = -2.0f;
 		state.enemyBullets.push_back(bullet);
 	}
 	// type = 0 = player bullet
 	else {
+		Mix_PlayChannel(-1, bulletSound, 0);
 		bullet.velY = 2.0f;
 		state.playerBullets.push_back(bullet);
 	}
@@ -327,13 +329,9 @@ void Setup() {
 
 	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
 	music = Mix_LoadMUS("BobRoss.mp3");
-	//music = Mix_LoadMUS("bulletSound.wav");
-	//Mix_PlayMusic(music, -1);
-	bulletSound = Mix_LoadWAV(RESOURCE_FOLDER"bulletSound.wav");
-	
-	if (!bulletSound) {
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	}
+	Mix_PlayMusic(music, -1);
+	bulletSound = Mix_LoadWAV(RESOURCE_FOLDER"Pulse-gun-03.wav");
+	//bork = Mix_LoadWAV(RESOURCE_FOLDER"dog_puppy.wav");
 }
 
 void ProcessEvents() {
