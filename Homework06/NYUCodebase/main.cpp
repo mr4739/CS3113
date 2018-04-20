@@ -257,7 +257,7 @@ void Entity::shootBullet(int type) {
 		state.bulletSprite.height * state.bulletSprite.size, state.bulletSprite, 1.0f);
 	// type = 1 = enemy bullet
 	if (type) {
-		//Mix_PlayChannel(-1, bork, 0);
+		Mix_PlayChannel(-1, bork, 0);
 		bullet.velY = -2.0f;
 		state.enemyBullets.push_back(bullet);
 	}
@@ -267,7 +267,6 @@ void Entity::shootBullet(int type) {
 		bullet.velY = 2.0f;
 		state.playerBullets.push_back(bullet);
 	}
-	//Mix_HaltChannel(-1);
 }
 
 void DrawText(ShaderProgram* program, int fontTexture, std::string text, float x, float y, float size, float spacing) {
@@ -331,7 +330,7 @@ void Setup() {
 	music = Mix_LoadMUS("BobRoss.mp3");
 	Mix_PlayMusic(music, -1);
 	bulletSound = Mix_LoadWAV(RESOURCE_FOLDER"Pulse-gun-03.wav");
-	//bork = Mix_LoadWAV(RESOURCE_FOLDER"dog_puppy.wav");
+	bork = Mix_LoadWAV(RESOURCE_FOLDER"Dog-Bark.wav");
 }
 
 void ProcessEvents() {
@@ -427,8 +426,6 @@ int main(int argc, char *argv[]) {
 		ProcessEvents();
 		updateState();
 		renderState();
-		//bulletSound = Mix_LoadWAV("bulletSound.wav");
-		//Mix_FadeInChannel(1, bulletSound, -1, 1);
 	}
 	Mix_FreeMusic(music);
 	Mix_FreeChunk(bulletSound);
